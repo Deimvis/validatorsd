@@ -10,7 +10,7 @@ go get github.com/Deimvis/validatorsd
 
 ## Quick Start
 
-1. Define your models (structs)
+1. Define your models (structs) + Implement `ValidateSelf` method
 
     ```go
     // models.go
