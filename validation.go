@@ -1,6 +1,7 @@
 package validatorsd
 
 import (
+	"errors"
 	"reflect"
 
 	"github.com/go-playground/validator/v10"
@@ -37,28 +38,65 @@ func ValidateTags(v *validator.Validate, obj interface{}) error {
 }
 
 func ValidateSelfRecursively(obj interface{}) error {
-	v := extractInternalValue(reflect.ValueOf(obj))
-	return validate(v)
+	return validateSelfRecursively(reflect.ValueOf(obj), false)
 }
 
-func validate(v reflect.Value) error {
+func validateSelfRecursively(v reflect.Value, ignoreNil bool) error {
+	return validate(extractInternalValue(v), ignoreNil)
+}
+
+func validate(v reflect.Value, ignoreNil bool) error {
+	var err error
+	switch v.Kind() {
+	case reflect.Struct:
+		err = validateStruct(v)
+	case reflect.Slice, reflect.Array:
+		err = validateSlice(v)
+	case reflect.Ptr: // nil pointer
+		if !v.IsNil() {
+			panic("bug: validate was called on external value (non-nil pointer)")
+		}
+		if ignoreNil {
+			err = nil
+		} else {
+			err = validateNilPtr(v)
+		}
+	default:
+		err = nil
+	}
+	return err
+}
+
+func validateStruct(v reflect.Value) error {
 	err := validateSelf(v)
 	if err != nil {
 		return err
 	}
-	if v.Kind() == reflect.Ptr {
-		v = v.Elem()
-	}
 	for i := 0; i < v.NumField(); i++ {
-		f := extractInternalValue(v.Field(i))
-		if f.Kind() == reflect.Struct {
-			err = validate(f)
-			if err != nil {
-				return err
-			}
+		err = validateSelfRecursively(v.Field(i), true /*ignore nil*/)
+		if err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+func validateSlice(v reflect.Value) error {
+	for i := 0; i < v.Len(); i++ {
+		err := validateSelfRecursively(v.Index(i), true /*ignore nil*/)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateNilPtr(v reflect.Value) error {
+	switch v.Type().Elem().Kind() {
+	case reflect.Slice, reflect.Array:
+		return nil
+	}
+	return errors.New("object is invalid: nil pointer")
 }
 
 func validateSelf(v reflect.Value) error {
@@ -93,7 +131,7 @@ func getPtr(v reflect.Value) reflect.Value {
 	return ptr
 }
 
-// source: https://github.com/go-playground/validator/blob/a947377040f8ebaee09f20d09a745ec369396793/util.go#L15
+// https://github.com/go-playground/validator/blob/a947377040f8ebaee09f20d09a745ec369396793/util.go#L15
 func extractInternalValue(current reflect.Value) reflect.Value {
 
 BEGIN:

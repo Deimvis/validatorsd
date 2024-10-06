@@ -68,7 +68,8 @@ go get github.com/Deimvis/validatorsd
 ## Details
 
 * `Validate` function validates using both validation tags and `ValidateSelf` methods on structs and substructs
-* `Validate` panics when the given object is nil
+* `Validate` returns error when the given object is nil (except when the given object is a slice, it returns nil)
 * `Validate` goes recursively through substructs, including embedded structs
 * If a struct/substruct doesn't implement a `ValidateSelf` method, nothing will happen and it will still be recursively traversed by `Validate` function
 * It doesn't matter whether `ValidateSelf` method has a value or a pointer receiver — `Validate` function will find it either way
+* Slice validation is supported for slice fields, but there are several caveats. For example, `validate(slice)` != `validate(slice[0]) && validate(slice[1]) && ...`, because `validate` called on slice ignores nil entries, but `validate` called directly on struct returns an error if struct is nil.

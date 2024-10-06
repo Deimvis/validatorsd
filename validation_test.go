@@ -31,7 +31,7 @@ func Test_ValidateSelf(t *testing.T) {
 }
 
 func Test_ValidateSelfFromNil(t *testing.T) {
-	require.Panics(t, func() {
+	require.NotPanics(t, func() {
 		ValidateSelfRecursively(nil)
 	})
 }
@@ -120,13 +120,49 @@ func Test_ValidateSelfFromPointer(t *testing.T) {
 	runValidateSelfRecursively(t, testCases)
 }
 
+func Test_ValidateSelfSlice(t *testing.T) {
+	testCases := []validateTestCase{
+		{
+			[]A{},
+			nil,
+		},
+		{
+			[]A{{V: 42}},
+			nil,
+		},
+		{
+			[]A{{V: 1}},
+			errors.New("wrong value"),
+		},
+		{
+			[]A{{V: 42}, {V: 42}},
+			nil,
+		},
+		{
+			[]A{{V: 1}, {V: 1}},
+			errors.New("wrong value"),
+		},
+		{
+			[]A{{V: 42}, {V: 1}},
+			errors.New("wrong value"),
+		},
+		{
+			[]A{{V: 1}, {V: 42}},
+			errors.New("wrong value"),
+		},
+	}
+	runValidateSelfRecursively(t, testCases)
+}
+
 func runValidateSelfRecursively(t *testing.T, testCases []validateTestCase) {
 	for i, tc := range testCases {
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
 			actual := ValidateSelfRecursively(tc.obj)
-			require.Equal(t, (tc.expected != nil), (actual != nil))
 			if tc.expected != nil {
+				require.Equal(t, true, actual != nil, "error should be not nil")
 				require.Equal(t, tc.expected.Error(), actual.Error())
+			} else {
+				require.Equal(t, nil, actual, "error should be nil")
 			}
 		})
 	}
